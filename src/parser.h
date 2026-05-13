@@ -5,52 +5,89 @@
 #include <string>
 #include <variant>
 
-#define DEBUG(X)                                                               \
-  do {                                                                         \
-    std::cerr << __FUNCTION__ << ":" << __LINE__ << ": '" << X << "'"          \
-              << std::endl;                                                    \
-  } while (false)
+struct input {
+public:
+  input(char const *ptr) : _orig(ptr), _ptr(ptr) {}
 
-using input = char const *;
+  auto data() const -> char const * { return _ptr; }
+
+  auto orig() const -> char const * { return _orig; }
+
+  auto operator++() -> input & {
+    ++_ptr;
+    return *this;
+  }
+
+  auto operator+=(size_t offset) -> input & {
+    _ptr += offset;
+    return *this;
+  }
+
+  auto operator=(input const &other) -> input & {
+    _ptr = other._ptr;
+    return *this;
+  }
+
+  auto operator+(size_t offset) const -> char const * { return _ptr + offset; }
+
+  auto operator-(size_t offset) const -> char const * { return _ptr - offset; }
+
+  auto operator*() const -> char { return *_ptr; }
+
+  auto operator++(int) -> input {
+    input tmp = *this;
+    ++_ptr;
+    return tmp;
+  }
+
+  auto operator==(input const &other) const -> bool {
+    return _ptr == other._ptr;
+  }
+
+  auto operator!=(input const &other) const -> bool {
+    return _ptr != other._ptr;
+  }
+
+private:
+  char const *const _orig;
+  char const *_ptr;
+};
 
 struct parse_error {
 public:
-  parse_error(input const context, input const input)
-      : _context(context), _input(input) {}
+  parse_error(input const &input) : _input(input) {}
 
   friend auto operator<<(std::ostream &out, parse_error const &error)
       -> std::ostream & {
-    size_t offset = (error._input - error._context);
+    static constexpr size_t context_size = 20;
 
-    size_t start = 0;
-    if (offset >= 10) {
-      start = offset - 10;
+    size_t offset = (error._input.data() - error._input.orig());
+    if (offset > context_size) {
+      offset = context_size;
     }
 
     size_t end = 0;
-    while (*(error._input + end) != '\0' && end < 10) {
+    while (*(error._input.data() + end) != '\0' && end <= context_size) {
       ++end;
     }
-    end += offset;
 
-    out << std::string_view(error._context + start, error._context + end)
-        << std::endl;
-    out << std::string(start, ' ') << '^' << std::endl;
+    out << "\033[1;31mERROR:\033[0m  "
+        << std::string_view(error._input.data() - offset, offset + end)
+        << (end > context_size ? "..." : "") << std::endl;
+    out << "        " << std::string(offset, ' ')
+        << "\033[1;31m^ Unexpected token.\033[0m" << std::endl;
 
     return out;
   }
 
-  parse_error(parse_error &&other)
-      : _context(other._context), _input(other._input) {}
+  parse_error(parse_error &&other) : _input(other._input) {}
 
   auto operator=(parse_error &&other) -> parse_error & {
-    _context = other._context;
     _input = other._input;
     return *this;
   }
 
 private:
-  ::input _context;
   ::input _input;
 };
 
@@ -58,8 +95,7 @@ struct result_type {
 public:
   result_type() {}
 
-  result_type(input const context, input const input)
-      : _error({context, input}) {}
+  result_type(input const input) : _error(input) {}
 
   result_type(result_type &&other) : _error(std::move(other._error)) {}
 
@@ -73,10 +109,9 @@ public:
   friend auto operator<<(std::ostream &out, result_type const &result)
       -> std::ostream & {
     if (result._error) {
-      out << "======= Parse Error =======" << std::endl;
       out << result._error.value();
     } else {
-      out << "======= Parse Success =======" << std::endl;
+      out << " \033[1;32mParse successful.\033[0m" << std::endl;
     }
     return out;
   }
@@ -218,7 +253,7 @@ inline auto take_while(::input &input, std::function<bool(char)> stop_when)
   while (!stop_when(*_input)) {
     ++_input;
   }
-  std::string res(input, _input - input);
+  std::string res(input.data(), _input.data() - input.data());
   skip(_input);
   input = _input;
   return res;
@@ -230,10 +265,10 @@ inline auto parse_float(stack &stack, input &input) -> return_value {
   std::string value =
       take_while(_input, [](char c) { return c < '0' || c > '9'; });
   if (value.empty()) {
-    return {input, _input};
+    return _input;
   }
   if (!match(_input, ".")) {
-    return {input, _input};
+    return _input;
   }
   std::string fraction =
       take_while(_input, [](char c) { return c < '0' || c > '9'; });
@@ -252,7 +287,7 @@ inline auto parse_integer(stack &stack, input &input) -> return_value {
   std::string value =
       take_while(_input, [](char c) { return c < '0' || c > '9'; });
   if (value.empty()) {
-    return {input, _input};
+    return _input;
   }
 
   value_type vtype = std::atoi(value.c_str());
@@ -266,11 +301,11 @@ inline auto parse_string(stack &stack, input &input) -> return_value {
   auto _input = input;
 
   if (!match(_input, "\"")) {
-    return {input, _input};
+    return _input;
   }
   value_type value = take_while(_input, [](char c) { return c == '"'; });
   if (!match(_input, "\"")) {
-    return {input, _input};
+    return _input;
   }
 
   stack.push(value);
@@ -310,7 +345,7 @@ inline auto parse_operator(stack &stack, input &input) -> return_value {
   } else if (match(_input, ">")) {
     stack.push(compare_operator::more);
   } else {
-    return {input, _input};
+    return _input;
   }
 
   input = _input;
@@ -353,8 +388,7 @@ inline auto parse_condition(stack &stack, input &input) -> return_value {
     }
     if (!match(_input, ")")) {
       pop_stack(stack, 1);
-      return return_value;
-      return {input, _input};
+      return _input;
     }
   } else {
     if (!(return_value = parse_compare(stack, _input))) {
@@ -365,7 +399,7 @@ inline auto parse_condition(stack &stack, input &input) -> return_value {
   if (match(_input, "&&")) {
     if (!parse_condition(stack, _input)) {
       pop_stack(stack, 1);
-      return {input, _input};
+      return _input;
     }
 
     auto if_left = pop_stack<::condition>(stack);
@@ -394,18 +428,18 @@ inline auto parse_block(stack &stack, input &input) -> return_value {
   auto _input = input;
 
   if (!match(_input, "{")) {
-    return {input, _input};
+    return _input;
   }
 
   if (parse_if(stack, _input)) {
   } else if (parse_value(stack, _input)) {
   } else {
-    return {input, _input};
+    return _input;
   }
 
   if (!match(_input, "}")) {
     pop_stack(stack, 1);
-    return {input, _input};
+    return _input;
   }
 
   input = _input;
@@ -418,7 +452,7 @@ inline auto parse_if(stack &stack, input &input) -> return_value {
   return_value return_value;
 
   if (!match(_input, "if")) {
-    return {input, _input};
+    return _input;
   }
   if (!(return_value = parse_condition(stack, _input))) {
     return return_value;
