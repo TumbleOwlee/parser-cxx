@@ -1,4 +1,4 @@
-#include "input.h"
+#include "parser/input.h"
 
 ::parse::Input::Input(char const *ptr) : _orig(ptr), _ptr(ptr) {}
 

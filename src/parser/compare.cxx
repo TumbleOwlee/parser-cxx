@@ -1,4 +1,4 @@
-#include "compare.h"
+#include "parser/compare.h"
 
 #include <string>
 #include <variant>

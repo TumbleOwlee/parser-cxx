@@ -1,9 +1,9 @@
-#include "types.h"
-#include "indent.h"
-#include "input.h"
-#include "result.h"
-#include "stack.h"
-#include "util.h"
+#include "parser/types.h"
+#include "parser/indent.h"
+#include "parser/input.h"
+#include "parser/result.h"
+#include "parser/stack.h"
+#include "parser/util.h"
 
 #include <string>
 

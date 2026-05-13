@@ -1,4 +1,4 @@
-#include "error.h"
+#include "parser/error.h"
 
 ::parse::Error::Error(::parse::Input const &input, size_t len)
     : _len(len), _input(input) {}
