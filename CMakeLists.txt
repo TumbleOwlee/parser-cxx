@@ -2,9 +2,9 @@
 cmake_minimum_required(VERSION 3.25)
 
 # Define project
-project(parser
+project(expression
     VERSION 0.0.1
-    DESCRIPTION "Draft implementation of a lua based EVSE driver."
+    DESCRIPTION "Draft implementation of an expression evaluation processor."
     LANGUAGES C CXX)
 
 # Export compile commands
