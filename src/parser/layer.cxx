@@ -35,12 +35,12 @@ auto ::parse::operator<<(std::ostream & out, parse::Layer const &layer) -> std::
 auto ::parse::operator<<(std::ostream & out, std::expected<std::vector<parse::Layer>, parse::Error> const &result)
     -> std::ostream & {
     if (result) {
-        std::cerr << "  \033[1;32mSUCCESS:\033[0m " << std::endl << std::endl;
+        out << "  \033[1;32mSUCCESS:\033[0m " << std::endl << std::endl;
         for (auto const &v : result.value()) {
-            std::cerr << "    - " << v << std::endl;
+            out << "    - " << v << std::endl;
         }
     } else {
-        std::cerr << result.error();
+        out << result.error();
     }
     return out;
 }

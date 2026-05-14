@@ -33,7 +33,7 @@ auto ::parse::operator<<(std::ostream & out, ::parse::Error const &error) -> std
     auto data = error.input().data();
     char const *pos = orig;
 
-    std::cerr << "  \033[1;31mERROR:\033[0m" << std::endl << std::endl;
+    out << "  \033[1;31mERROR:\033[0m" << std::endl << std::endl;
     while ((!pending || *pending > 0) && *orig != '\0') {
         while (*pos != '\0' && *pos != '\n') {
             ++pos;
@@ -64,7 +64,7 @@ auto ::parse::operator<<(std::ostream & out, ::parse::Error const &error) -> std
     }
 
     while (start != end) {
-        std::cerr << lines[start];
+        out << lines[start];
         start = (start + 1) % CONTEXT_LENGTH;
     }
 
