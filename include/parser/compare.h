@@ -39,6 +39,12 @@ namespace parse::compare {
     };
 
     /*!
+     * \brief Overloads the stream insertion operator to print a human-readable
+     * representation of a Comparison operator.
+     */
+    auto operator<<(std::ostream &out, Comparison const &comparison) -> std::ostream &;
+
+    /*!
      * \brief Evaluates the comparison between two ::parse::Value instances based on
      * the specified Comparison operator.
      *

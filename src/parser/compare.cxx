@@ -26,8 +26,8 @@ struct Context {
     }
 };
 
-auto ::parse::compare::eval(::parse::Value const &left, ::parse::compare::Comparison op, ::parse::Value const &right)
-    -> bool {
+auto ::parse::compare::eval(::parse::Value const &left, ::parse::compare::Comparison comparison,
+                            ::parse::Value const &right) -> bool {
 
 #define apply_compare_type(T, S)                                                                                       \
     do {                                                                                                               \
@@ -35,14 +35,14 @@ auto ::parse::compare::eval(::parse::Value const &left, ::parse::compare::Compar
             T const *v1 = std::get_if<T>(&left);                                                                       \
             S const *v2 = std::get_if<S>(&right);                                                                      \
             if (v1 != nullptr && v2 != nullptr) {                                                                      \
-                return Context<T, S>::eval(*v1, op, *v2);                                                              \
+                return Context<T, S>::eval(*v1, comparison, *v2);                                                      \
             }                                                                                                          \
         }                                                                                                              \
         {                                                                                                              \
             S const *v1 = std::get_if<S>(&left);                                                                       \
             T const *v2 = std::get_if<T>(&right);                                                                      \
             if (v1 != nullptr && v2 != nullptr) {                                                                      \
-                return Context<S, T>::eval(*v1, op, *v2);                                                              \
+                return Context<S, T>::eval(*v1, comparison, *v2);                                                      \
             }                                                                                                          \
         }                                                                                                              \
     } while (false)
@@ -65,4 +65,28 @@ auto ::parse::compare::eval(::parse::Value const &left, ::parse::compare::Compar
 #undef apply_compare_type
 
     return false;
+}
+
+auto ::parse::compare::operator<<(std::ostream & out, Comparison const &comparison) -> std::ostream & {
+    switch (comparison) {
+    case Comparison::Less:
+        out << "<";
+        break;
+    case Comparison::LessEqual:
+        out << "<=";
+        break;
+    case Comparison::Equal:
+        out << "==";
+        break;
+    case Comparison::NotEqual:
+        out << "!=";
+        break;
+    case Comparison::Greater:
+        out << ">";
+        break;
+    case Comparison::GreaterThan:
+        out << ">=";
+        break;
+    }
+    return out;
 }

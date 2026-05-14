@@ -36,6 +36,7 @@ auto ::parse::Type<float>::parse(Stack &stack, Input &input) -> ::parse::Result 
     ::parse::Value vtype = mult * std::atof(num.c_str());
 
     stack.push(vtype);
+    skip(_input);
     input = _input;
     return {};
 }
@@ -62,6 +63,7 @@ auto ::parse::Type<int>::parse(Stack &stack, Input &input) -> ::parse::Result {
     ::parse::Value vtype = mult * std::atoi(value.c_str());
 
     stack.push(vtype);
+    skip(_input);
     input = _input;
     return {};
 }
@@ -84,6 +86,7 @@ auto ::parse::Type<std::string>::parse(Stack &stack, Input &input) -> ::parse::R
     }
 
     stack.push(value);
+    skip(_input);
     input = _input;
     return {};
 }
@@ -104,6 +107,7 @@ auto ::parse::Type<bool>::parse(Stack &stack, Input &input) -> ::parse::Result {
     } else {
         return {_input, 4};
     }
+    skip(_input);
     input = _input;
     return {};
 }
@@ -118,10 +122,19 @@ auto ::parse::Type<::parse::Value>::parse(Stack &stack, Input &input) -> ::parse
     DEBUG_INDENT;
     ::parse::Result result;
 
+    bool brackets = false;
+
+    if (match(_input, "(")) {
+        brackets = true;
+    }
+
 #define _PARSE_CHECK_TYPE(T)                                                                                           \
     {                                                                                                                  \
         ::parse::Result value;                                                                                         \
         if ((value = ::parse::Type<T>::parse(stack, _input))) {                                                        \
+            if (brackets && !match(_input, ")")) {                                                                     \
+                return {_input, 1};                                                                                    \
+            }                                                                                                          \
             input = _input;                                                                                            \
             return {};                                                                                                 \
         } else if (result || result.error() < value.error()) {                                                         \
@@ -176,26 +189,33 @@ template <>
 auto ::parse::Type<::parse::Compare>::parse(Stack &stack, Input &input) -> ::parse::Result {
     auto _input = input;
     DEBUG_INDENT;
+    auto brackets = false;
 
     ::parse::Result result;
+
+    if (match(_input, "(")) {
+        brackets = true;
+    }
 
     if (!(result = Type<::parse::Value>::parse(stack, _input))) {
         return result;
     }
     auto left = stack.pop<::parse::Value>();
 
-    if ((result = ::parse::Type<::parse::compare::Comparison>::parse(stack, _input))) {
-        auto op = stack.pop<parse::compare::Comparison>();
-        if (!(result = Type<::parse::Value>::parse(stack, _input))) {
-            return result;
-        }
-        auto right = stack.pop<::parse::Value>();
-
-        stack.push(::parse::Value(::parse::compare::eval(left, op, right)));
-    } else {
-        auto left = stack.pop<::parse::Value>();
-        stack.push(::parse::Value(left));
+    if (!(result = ::parse::Type<::parse::compare::Comparison>::parse(stack, _input))) {
+        return result;
     }
+    auto op = stack.pop<parse::compare::Comparison>();
+    if (!(result = Type<::parse::Value>::parse(stack, _input))) {
+        return result;
+    }
+    auto right = stack.pop<::parse::Value>();
+
+    if (brackets && !match(_input, ")")) {
+        return {_input, 1};
+    }
+
+    stack.push(::parse::Value(::parse::compare::eval(left, op, right)));
 
     input = _input;
     return {};
@@ -210,21 +230,41 @@ auto ::parse::Type<::parse::Condition>::parse(Stack &stack, Input &input) -> ::p
     auto _input = input;
     DEBUG_INDENT;
 
-    parse::Result result;
+    parse::Result result(_input, 1);
     ::parse::Value left;
 
-    if (match(_input, "(")) {
-        if (!(result = ::parse::Type<::parse::Condition>::parse(stack, _input))) {
-            return result;
+    if (!result) {
+        auto _input1 = _input;
+        if (match(_input1, "(")) {
+            if ((result = ::parse::Type<::parse::Condition>::parse(stack, _input1))) {
+                left = stack.pop<::parse::Value>();
+                if (match(_input1, ")")) {
+                    _input = _input1;
+                } else {
+                    result = {_input1, 1};
+                }
+            }
         }
-        left = stack.pop<::parse::Value>();
-        if (!match(_input, ")")) {
-            return {_input, 1};
+    }
+
+    if (!result) {
+        auto _input1 = _input;
+        if ((result = Type<::parse::Compare>::parse(stack, _input1))) {
+            left = stack.pop<::parse::Value>();
+            _input = _input1;
         }
-    } else {
-        if (!(result = Type<::parse::Compare>::parse(stack, _input))) {
-            return result;
+    }
+
+    if (!result) {
+        auto _input1 = _input;
+        if ((result = Type<::parse::Value>::parse(stack, _input1))) {
+            left = stack.pop<::parse::Value>();
+            _input = _input1;
         }
+    }
+
+    if (!result) {
+        return result;
     }
 
     if (match(_input, "&&")) {
@@ -241,6 +281,8 @@ auto ::parse::Type<::parse::Condition>::parse(Stack &stack, Input &input) -> ::p
 
         auto right = stack.pop<::parse::Value>();
         stack.push(left || right);
+    } else {
+        stack.push(left);
     }
 
     input = _input;
