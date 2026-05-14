@@ -17,13 +17,30 @@ namespace parse {
         }
     }
 
+    inline auto peak(::parse::Input &input, char const *match) -> bool {
+        auto _input = input;
+        while (*match != '\0') {
+            if (*_input == '\0') {
+                return false;
+            }
+
+            if (*_input == *match) {
+                ++_input;
+                ++match;
+            } else {
+                return false;
+            }
+        }
+        return true;
+    }
+
     /*!
      * \brief Match a specific string in the input.
      * \param input The input to match against.
      * \param match The string to match.
      * \return True if the match is successful, false otherwise.
      */
-    inline auto match(::parse::Input &input, ::parse::Input match) -> bool {
+    inline auto match(::parse::Input &input, char const *match) -> bool {
         auto _input = input;
         while (*match != '\0') {
             if (*_input == '\0') {

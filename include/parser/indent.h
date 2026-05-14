@@ -43,7 +43,10 @@ namespace parse {
         template <typename T>
         auto operator<<(T const &value) -> IndentLogger & {
             auto &data = indents(std::this_thread::get_id());
-            std::cerr << std::string(data.level * 2, ' ') << value << std::endl;
+            for (auto i = 0; i < data.level; ++i) {
+                std::cerr << "|   ";
+            }
+            std::cerr << value << std::endl;
             return *this;
         }
 

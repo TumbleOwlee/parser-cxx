@@ -128,15 +128,19 @@ auto ::parse::Type<::parse::Value>::parse(Stack &stack, Input &input) -> ::parse
         brackets = true;
     }
 
+    if (peak(_input, "(")) {
+        auto result = ::parse::Type<::parse::Value>::parse(stack, _input);
+        if (!result) {
+            return result;
+        }
+        goto parse_type_value_parse_exit;
+    }
+
 #define _PARSE_CHECK_TYPE(T)                                                                                           \
     {                                                                                                                  \
         ::parse::Result value;                                                                                         \
         if ((value = ::parse::Type<T>::parse(stack, _input))) {                                                        \
-            if (brackets && !match(_input, ")")) {                                                                     \
-                return {_input, 1};                                                                                    \
-            }                                                                                                          \
-            input = _input;                                                                                            \
-            return {};                                                                                                 \
+            goto parse_type_value_parse_exit;                                                                          \
         } else if (result || result.error() < value.error()) {                                                         \
             result = std::move(value);                                                                                 \
         }                                                                                                              \
@@ -148,8 +152,14 @@ auto ::parse::Type<::parse::Value>::parse(Stack &stack, Input &input) -> ::parse
     _PARSE_CHECK_TYPE(bool);
 
 #undef _PARSE_CHECK_TYPE
-
     return result;
+
+parse_type_value_parse_exit:
+    if (brackets && !match(_input, ")")) {
+        return {_input, 1};
+    }
+    input = _input;
+    return {};
 }
 
 // ============================================================
@@ -189,33 +199,54 @@ template <>
 auto ::parse::Type<::parse::Compare>::parse(Stack &stack, Input &input) -> ::parse::Result {
     auto _input = input;
     DEBUG_INDENT;
-    auto brackets = false;
 
-    ::parse::Result result;
+    auto brackets = false;
+    ::parse::Value left_value;
+    ::parse::Value right_value;
+    ::parse::compare::Comparison comparison;
+
+    ::parse::Result result = {nullptr, 0};
 
     if (match(_input, "(")) {
         brackets = true;
     }
 
-    if (!(result = Type<::parse::Value>::parse(stack, _input))) {
+    // Recursive by simple brackets
+    if (peak(_input, "(")) {
+        auto _input1 = _input;
+        result = ::parse::Type<::parse::Compare>::parse(stack, _input1);
+        if (result) {
+            _input = _input1;
+            goto parse_type_compare_parse_exit;
+        }
+    }
+
+    // Recursive with left side in brackets
+    if (peak(_input, "(")) {
+        if (!(result = ::parse::Type<::parse::Value>::parse(stack, _input))) {
+            return result;
+        }
+    } else if (!(result = Type<::parse::Value>::parse(stack, _input))) {
         return result;
     }
-    auto left = stack.pop<::parse::Value>();
+    left_value = stack.pop<::parse::Value>();
 
     if (!(result = ::parse::Type<::parse::compare::Comparison>::parse(stack, _input))) {
         return result;
     }
-    auto op = stack.pop<parse::compare::Comparison>();
+    comparison = stack.pop<parse::compare::Comparison>();
+
     if (!(result = Type<::parse::Value>::parse(stack, _input))) {
         return result;
     }
-    auto right = stack.pop<::parse::Value>();
+    right_value = stack.pop<::parse::Value>();
 
+    stack.push(::parse::Value(::parse::compare::eval(left_value, comparison, right_value)));
+
+parse_type_compare_parse_exit:
     if (brackets && !match(_input, ")")) {
         return {_input, 1};
     }
-
-    stack.push(::parse::Value(::parse::compare::eval(left, op, right)));
 
     input = _input;
     return {};
